@@ -36,12 +36,14 @@ export async function requestNotificationPermission(): Promise<boolean> {
 export function sendNotification(title: string, body: string): void {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
-  new Notification(title, {
-    body,
-    icon: '🏋️',
-    badge: '🔥',
-    vibrate: [200, 100, 200],
-  });
+  try {
+    new Notification(title, { body });
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  } catch {
+    // Fallback silently
+  }
 }
 
 let notificationIntervals: ReturnType<typeof setInterval>[] = [];
