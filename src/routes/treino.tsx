@@ -2,10 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { trainingPlan } from "../lib/training-data";
+import { defaultTrainingPlan, progressionTips } from "../lib/training-data";
+import type { TrainingDay, Exercise } from "../lib/training-data";
 import { load, save, todayKey } from "../lib/storage";
 import type { WorkoutLog } from "../lib/storage";
-import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check, Timer, Edit3, Trash2 } from "lucide-react";
+import { RestTimer } from "../components/RestTimer";
+import { EditExerciseDialog } from "../components/EditExerciseDialog";
 
 export const Route = createFileRoute("/treino")({
   component: TreinoPage,
@@ -21,12 +24,26 @@ function TreinoPage() {
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [showSubstitute, setShowSubstitute] = useState<string | null>(null);
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
+  const [showTimer, setShowTimer] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(90);
+  const [editMode, setEditMode] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<{ exercise: Exercise | null; index: number; isNew: boolean } | null>(null);
+
+  // Load custom plan or default
+  const [plan, setPlan] = useState<TrainingDay[]>(defaultTrainingPlan);
 
   useEffect(() => {
+    const custom = load<TrainingDay[] | null>('custom_training_plan', null);
+    if (custom) setPlan(custom);
     setLogs(load<WorkoutLog[]>('workout_logs', []));
   }, []);
 
-  const day = trainingPlan[selectedDay];
+  function savePlan(newPlan: TrainingDay[]) {
+    setPlan(newPlan);
+    save('custom_training_plan', newPlan);
+  }
+
+  const day = plan[selectedDay];
   const today = todayKey();
 
   function getExerciseLogs(exerciseId: string): WorkoutLog | undefined {
@@ -69,13 +86,50 @@ function TreinoPage() {
     }
   }
 
+  function startTimer(restStr: string) {
+    const match = restStr.match(/(\d+)/);
+    const secs = match ? parseInt(match[1]) : 60;
+    setTimerSeconds(secs);
+    setShowTimer(true);
+  }
+
+  function handleSaveExercise(exercise: Exercise) {
+    const newPlan = [...plan];
+    const dayData = { ...newPlan[selectedDay], exercises: [...newPlan[selectedDay].exercises] };
+    if (editingExercise!.isNew) {
+      dayData.exercises.push(exercise);
+    } else {
+      dayData.exercises[editingExercise!.index] = exercise;
+    }
+    newPlan[selectedDay] = dayData;
+    savePlan(newPlan);
+    setEditingExercise(null);
+  }
+
+  function handleDeleteExercise(index: number) {
+    const newPlan = [...plan];
+    const dayData = { ...newPlan[selectedDay], exercises: [...newPlan[selectedDay].exercises] };
+    dayData.exercises.splice(index, 1);
+    newPlan[selectedDay] = dayData;
+    savePlan(newPlan);
+    setEditingExercise(null);
+  }
+
+  function resetPlan() {
+    setPlan(defaultTrainingPlan);
+    save('custom_training_plan', null);
+    setEditMode(false);
+  }
+
+  if (!day) return null;
+
   return (
     <div>
       <PageHeader title="TREINO" subtitle={`${day.name} — ${day.focus}`} emoji="🏋️" />
 
       {/* Day selector */}
-      <div className="px-4 mb-4 flex gap-2 overflow-x-auto pb-2">
-        {trainingPlan.map((d, i) => (
+      <div className="px-4 mb-3 flex gap-2 overflow-x-auto pb-2">
+        {plan.map((d: TrainingDay, i: number) => (
           <button
             key={d.id}
             onClick={() => setSelectedDay(i)}
@@ -91,9 +145,43 @@ function TreinoPage() {
         ))}
       </div>
 
+      {/* Edit mode toggle */}
+      <div className="px-4 mb-3 flex items-center justify-between">
+        <button
+          onClick={() => setEditMode(!editMode)}
+          className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+            editMode ? 'bg-warning/20 text-warning' : 'bg-secondary text-secondary-foreground'
+          }`}
+        >
+          <Edit3 size={12} /> {editMode ? 'Editando...' : 'Editar Treino'}
+        </button>
+        {editMode && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setEditingExercise({ exercise: null, index: -1, isNew: true })}
+              className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground"
+            >
+              <Plus size={12} /> Exercício
+            </button>
+            <button onClick={resetPlan} className="text-xs text-destructive font-bold px-2 py-1.5">
+              Resetar
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Cardio note */}
+      {day.cardioNote && (
+        <div className="px-4 mb-3">
+          <div className="bg-primary/10 tactical-border rounded-lg p-3 text-xs font-bold text-primary">
+            {day.cardioNote}
+          </div>
+        </div>
+      )}
+
       {/* Exercises */}
-      <div className="px-4 space-y-3 mb-6">
-        {day.exercises.map((exercise, exIdx) => {
+      <div className="px-4 space-y-3 mb-4">
+        {day.exercises.map((exercise: Exercise, exIdx: number) => {
           const isExpanded = expandedExercise === exercise.id;
           const showSubs = showSubstitute === exercise.id;
           const exerciseLog = getExerciseLogs(exercise.id);
@@ -115,6 +203,14 @@ function TreinoPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-primary">{exIdx + 1}</span>
                     <span className="text-sm font-bold text-foreground">{exercise.name}</span>
+                    {editMode && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingExercise({ exercise, index: exIdx, isNew: false }); }}
+                        className="text-warning ml-1"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-xs text-muted-foreground">{exercise.sets}x{exercise.reps}</span>
@@ -149,6 +245,14 @@ function TreinoPage() {
                         Músculo: <span className="text-foreground font-semibold">{exercise.muscleGroup}</span>
                       </div>
 
+                      {/* Rest timer button */}
+                      <button
+                        onClick={() => startTimer(exercise.rest)}
+                        className="flex items-center gap-2 text-xs bg-primary/10 text-primary font-bold px-3 py-2 rounded-lg w-full justify-center"
+                      >
+                        <Timer size={14} /> Iniciar Timer ({exercise.rest})
+                      </button>
+
                       {/* Substitutes */}
                       <button
                         onClick={() => setShowSubstitute(showSubs ? null : exercise.id)}
@@ -158,7 +262,7 @@ function TreinoPage() {
                       </button>
                       {showSubs && (
                         <div className="space-y-1">
-                          {exercise.substitutes.map(sub => (
+                          {exercise.substitutes.map((sub: string) => (
                             <div key={sub} className="text-xs text-secondary-foreground bg-secondary rounded-md px-3 py-2">
                               → {sub}
                             </div>
@@ -213,6 +317,44 @@ function TreinoPage() {
           );
         })}
       </div>
+
+      {/* Progression tips */}
+      <div className="px-4 mb-6">
+        <div className="glass-card p-4">
+          <h3 className="text-sm font-bold text-foreground mb-3">{progressionTips.title}</h3>
+          <div className="space-y-3">
+            {progressionTips.items.map((item) => (
+              <div key={item.title} className="flex items-start gap-3">
+                <span className="text-lg">{item.icon}</span>
+                <div>
+                  <span className="text-xs font-bold text-foreground">{item.title}</span>
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Rest Timer */}
+      <AnimatePresence>
+        {showTimer && (
+          <RestTimer defaultSeconds={timerSeconds} onClose={() => setShowTimer(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Exercise Dialog */}
+      <AnimatePresence>
+        {editingExercise && (
+          <EditExerciseDialog
+            exercise={editingExercise.exercise}
+            isNew={editingExercise.isNew}
+            onSave={handleSaveExercise}
+            onDelete={editingExercise.isNew ? undefined : () => handleDeleteExercise(editingExercise.index)}
+            onClose={() => setEditingExercise(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

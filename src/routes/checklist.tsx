@@ -5,7 +5,14 @@ import { PageHeader } from "../components/PageHeader";
 import { load, save, todayKey } from "../lib/storage";
 import type { DailyCheck } from "../lib/storage";
 import { antiFailProtocol } from "../lib/training-data";
-import { Dumbbell, Flame, Moon, Droplets, Activity, Pill, Save, Shield } from "lucide-react";
+import { Dumbbell, Flame, Moon, Droplets, Activity, Pill, Save, Shield, Bell, BellOff } from "lucide-react";
+import {
+  getNotificationSettings,
+  saveNotificationSettings,
+  requestNotificationPermission,
+  scheduleNotifications,
+  type NotificationSettings,
+} from "../lib/notifications";
 
 export const Route = createFileRoute("/checklist")({
   component: ChecklistPage,
@@ -28,6 +35,8 @@ function ChecklistPage() {
   const [checks, setChecks] = useState<DailyCheck[]>([]);
   const [notes, setNotes] = useState('');
   const [showProtocol, setShowProtocol] = useState(false);
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings>(getNotificationSettings());
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
   useEffect(() => {
     const loaded = load<DailyCheck[]>('daily_checks', []);
@@ -36,6 +45,8 @@ function ChecklistPage() {
     if (todayCheck) {
       setNotes(todayCheck.notes);
     }
+    // Start notifications
+    scheduleNotifications(notifSettings);
   }, [today]);
 
   const todayCheck = checks.find(c => c.date === today) || {
@@ -153,6 +164,93 @@ function ChecklistPage() {
                 <p className="text-xs text-muted-foreground">{rule.description}</p>
               </motion.div>
             ))}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Notifications */}
+      <div className="px-4 mb-6">
+        <button
+          onClick={() => setShowNotifPanel(!showNotifPanel)}
+          className="w-full glass-card p-4 text-left flex items-center justify-between"
+        >
+          <div className="flex items-center gap-2">
+            {notifSettings.enabled ? <Bell size={16} className="text-primary" /> : <BellOff size={16} className="text-muted-foreground" />}
+            <span className="text-sm font-bold text-foreground">🔔 Notificações</span>
+          </div>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${notifSettings.enabled ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+            {notifSettings.enabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
+
+        {showNotifPanel && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-3 glass-card p-4 space-y-3"
+          >
+            {/* Master toggle */}
+            <button
+              onClick={async () => {
+                if (!notifSettings.enabled) {
+                  const granted = await requestNotificationPermission();
+                  if (!granted) return;
+                }
+                const updated = { ...notifSettings, enabled: !notifSettings.enabled };
+                setNotifSettings(updated);
+                saveNotificationSettings(updated);
+                scheduleNotifications(updated);
+              }}
+              className={`w-full py-2 rounded-lg text-sm font-bold transition-all ${
+                notifSettings.enabled ? 'bg-destructive/10 text-destructive' : 'bg-primary text-primary-foreground'
+              }`}
+            >
+              {notifSettings.enabled ? 'Desativar Notificações' : 'Ativar Notificações'}
+            </button>
+
+            {notifSettings.enabled && (
+              <>
+                {/* Training time */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-foreground">🏋️ Lembrete Treino</span>
+                  <input
+                    type="time"
+                    value={notifSettings.treinoTime}
+                    onChange={e => {
+                      const updated = { ...notifSettings, treinoTime: e.target.value };
+                      setNotifSettings(updated);
+                      saveNotificationSettings(updated);
+                      scheduleNotifications(updated);
+                    }}
+                    className="bg-input text-foreground text-xs px-2 py-1 rounded-md border-0 outline-none"
+                  />
+                </div>
+
+                {/* Toggles */}
+                {([
+                  { key: 'refeicoes' as const, label: '🍽️ Lembretes de Refeição' },
+                  { key: 'pesagem' as const, label: '⚖️ Pesagem Semanal (Seg 8h)' },
+                ] as const).map(item => (
+                  <button
+                    key={item.key}
+                    onClick={() => {
+                      const updated = { ...notifSettings, [item.key]: !notifSettings[item.key] };
+                      setNotifSettings(updated);
+                      saveNotificationSettings(updated);
+                      scheduleNotifications(updated);
+                    }}
+                    className="w-full flex items-center justify-between py-1"
+                  >
+                    <span className="text-xs font-bold text-foreground">{item.label}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      notifSettings[item.key] ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {notifSettings[item.key] ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
           </motion.div>
         )}
       </div>
