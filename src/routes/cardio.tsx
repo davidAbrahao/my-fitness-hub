@@ -16,12 +16,14 @@ function CardioPage() {
     LISS: 'text-success',
     HIIT: 'text-destructive',
     MISS: 'text-warning',
+    'METABÓLICO': 'text-primary',
   };
 
   const typeBg: Record<string, string> = {
     LISS: 'bg-success/10 tactical-border',
     HIIT: 'bg-destructive/10 border border-destructive/20',
     MISS: 'bg-warning/10 border border-warning/20',
+    'METABÓLICO': 'bg-primary/10 border border-primary/20',
   };
 
   return (
