@@ -80,6 +80,12 @@ function DietaPage() {
             <div className="h-full bg-warning" style={{ width: `${diet.macros.carbs.pct}%` }} />
             <div className="h-full bg-destructive" style={{ width: `${diet.macros.fat.pct}%` }} />
           </div>
+          <div className="mt-2 text-center">
+            <span className="text-xs text-muted-foreground">Total das refeições: </span>
+            <span className="text-xs font-bold text-primary">
+              {diet.meals.reduce((s: number, m: MealData) => s + (m.calories ?? 0), 0)} kcal
+            </span>
+          </div>
         </div>
       </div>
 
