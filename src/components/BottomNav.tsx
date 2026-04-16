@@ -5,6 +5,7 @@ const tabs = [
   { to: '/', icon: LayoutDashboard, label: 'Painel' },
   { to: '/treino', icon: Dumbbell, label: 'Treino' },
   { to: '/dieta', icon: UtensilsCrossed, label: 'Dieta' },
+  { to: '/cardio', icon: Heart, label: 'Cardio' },
   { to: '/checklist', icon: ClipboardCheck, label: 'Check' },
   { to: '/corpo', icon: Target, label: 'Corpo' },
   { to: '/ferramentas', icon: Wrench, label: 'Tools' },
@@ -22,18 +23,18 @@ export function BottomNav() {
           <Link
             key={tab.to}
             to={tab.to}
-            className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all duration-200 ${
+            className={`flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-lg transition-all duration-200 ${
               isActive
                 ? 'text-primary'
                 : 'text-muted-foreground'
             }`}
           >
-            <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
-            <span className={`text-[10px] leading-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
+            <Icon size={18} strokeWidth={isActive ? 2.5 : 1.5} />
+            <span className={`text-[9px] leading-tight ${isActive ? 'font-bold' : 'font-medium'}`}>
               {tab.label}
             </span>
             {isActive && (
-              <div className="h-0.5 w-4 rounded-full bg-primary mt-0.5" />
+              <div className="h-0.5 w-3 rounded-full bg-primary mt-0.5" />
             )}
           </Link>
         );
