@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   calculate1RM,
   percentageZones,
@@ -256,32 +257,73 @@ function PRTracker() {
         </div>
       </div>
 
-      {/* PR List */}
-      {grouped.map(({ name, best, records }) => (
-        <div key={name} className="glass-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="text-sm font-bold text-foreground">{name}</span>
-              <div className="text-xs text-primary font-bold">
-                🏅 Melhor 1RM: {best.estimated1RM} kg
+      {/* PR List with Charts */}
+      {grouped.map(({ name, best, records }) => {
+        const chartData = [...records].reverse().map(r => ({
+          date: r.date.slice(5),
+          '1RM': r.estimated1RM,
+          peso: r.weight,
+        }));
+
+        return (
+          <div key={name} className="glass-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <span className="text-sm font-bold text-foreground">{name}</span>
+                <div className="text-xs text-primary font-bold">
+                  🏅 Melhor 1RM: {best.estimated1RM} kg
+                </div>
               </div>
+              <Trophy size={20} className="text-warning" />
             </div>
-            <Trophy size={20} className="text-warning" />
-          </div>
-          <div className="space-y-1">
-            {records.map((r, i) => (
-              <div key={i} className="flex items-center justify-between text-xs bg-secondary rounded-lg px-3 py-2">
-                <span className="text-muted-foreground">{r.date}</span>
-                <span className="text-foreground font-bold">{r.weight}kg × {r.reps} reps</span>
-                <span className="text-primary font-bold">~{r.estimated1RM}kg</span>
-                <button onClick={() => removePR(prs.indexOf(r))} className="text-destructive ml-2">
-                  <Trash2 size={12} />
-                </button>
+
+            {/* Chart */}
+            {chartData.length >= 2 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-1 mb-2">
+                  <TrendingUp size={12} className="text-primary" />
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">Evolução do 1RM</span>
+                </div>
+                <ResponsiveContainer width="100%" height={120}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.015 260)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'oklch(0.60 0.02 260)' }} />
+                    <YAxis tick={{ fontSize: 9, fill: 'oklch(0.60 0.02 260)' }} domain={['auto', 'auto']} width={35} />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'oklch(0.16 0.015 260)',
+                        border: '1px solid oklch(0.30 0.015 260)',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="1RM"
+                      stroke="oklch(0.78 0.19 135)"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: 'oklch(0.78 0.19 135)' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            ))}
+            )}
+
+            <div className="space-y-1">
+              {records.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-xs bg-secondary rounded-lg px-3 py-2">
+                  <span className="text-muted-foreground">{r.date}</span>
+                  <span className="text-foreground font-bold">{r.weight}kg × {r.reps} reps</span>
+                  <span className="text-primary font-bold">~{r.estimated1RM}kg</span>
+                  <button onClick={() => removePR(prs.indexOf(r))} className="text-destructive ml-2">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {grouped.length === 0 && (
         <div className="text-center text-muted-foreground text-sm py-8">

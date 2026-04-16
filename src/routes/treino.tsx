@@ -6,10 +6,10 @@ import { defaultTrainingPlan, progressionTips } from "../lib/training-data";
 import type { TrainingDay, Exercise } from "../lib/training-data";
 import { load, save, todayKey } from "../lib/storage";
 import type { WorkoutLog } from "../lib/storage";
-import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check, Timer, Edit3, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check, Timer, Edit3, Trash2, ExternalLink, Flame } from "lucide-react";
 import { RestTimer } from "../components/RestTimer";
 import { EditExerciseDialog } from "../components/EditExerciseDialog";
-
+import { getExerciseGifUrl, workoutCalories } from "../lib/exercise-utils";
 export const Route = createFileRoute("/treino")({
   component: TreinoPage,
   head: () => ({
@@ -170,14 +170,25 @@ function TreinoPage() {
         )}
       </div>
 
-      {/* Cardio note */}
-      {day.cardioNote && (
-        <div className="px-4 mb-3">
+      {/* Calorie estimate + Cardio note */}
+      <div className="px-4 mb-3">
+        {workoutCalories[day.id] && (
+          <div className="glass-card p-3 mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Flame size={14} className="text-destructive" />
+              <span className="text-xs font-bold text-foreground">Gasto estimado</span>
+            </div>
+            <span className="text-xs font-bold text-primary">
+              ~{workoutCalories[day.id].min}–{workoutCalories[day.id].max} kcal
+            </span>
+          </div>
+        )}
+        {day.cardioNote && (
           <div className="bg-primary/10 tactical-border rounded-lg p-3 text-xs font-bold text-primary">
             {day.cardioNote}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Exercises */}
       <div className="px-4 space-y-3 mb-4">
@@ -244,6 +255,21 @@ function TreinoPage() {
                       <div className="text-xs text-muted-foreground">
                         Músculo: <span className="text-foreground font-semibold">{exercise.muscleGroup}</span>
                       </div>
+
+                      {/* GIF link */}
+                      {(() => {
+                        const gifUrl = getExerciseGifUrl(exercise.name);
+                        return gifUrl ? (
+                          <a
+                            href={gifUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-xs bg-chart-3/10 text-chart-3 font-bold px-3 py-2 rounded-lg w-full justify-center border border-chart-3/20"
+                          >
+                            <ExternalLink size={14} /> Ver Execução (GIF/Vídeo)
+                          </a>
+                        ) : null;
+                      })()}
 
                       {/* Rest timer button */}
                       <button
