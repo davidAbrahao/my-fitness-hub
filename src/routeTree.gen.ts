@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TreinoRouteImport } from './routes/treino'
+import { Route as FerramentasRouteImport } from './routes/ferramentas'
 import { Route as DietaRouteImport } from './routes/dieta'
 import { Route as CorpoRouteImport } from './routes/corpo'
 import { Route as ChecklistRouteImport } from './routes/checklist'
@@ -19,6 +20,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TreinoRoute = TreinoRouteImport.update({
   id: '/treino',
   path: '/treino',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FerramentasRoute = FerramentasRouteImport.update({
+  id: '/ferramentas',
+  path: '/ferramentas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DietaRoute = DietaRouteImport.update({
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/checklist': typeof ChecklistRoute
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
+  '/ferramentas': typeof FerramentasRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/checklist': typeof ChecklistRoute
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
+  '/ferramentas': typeof FerramentasRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRoutesById {
@@ -70,13 +78,28 @@ export interface FileRoutesById {
   '/checklist': typeof ChecklistRoute
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
+  '/ferramentas': typeof FerramentasRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cardio' | '/checklist' | '/corpo' | '/dieta' | '/treino'
+  fullPaths:
+    | '/'
+    | '/cardio'
+    | '/checklist'
+    | '/corpo'
+    | '/dieta'
+    | '/ferramentas'
+    | '/treino'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cardio' | '/checklist' | '/corpo' | '/dieta' | '/treino'
+  to:
+    | '/'
+    | '/cardio'
+    | '/checklist'
+    | '/corpo'
+    | '/dieta'
+    | '/ferramentas'
+    | '/treino'
   id:
     | '__root__'
     | '/'
@@ -84,6 +107,7 @@ export interface FileRouteTypes {
     | '/checklist'
     | '/corpo'
     | '/dieta'
+    | '/ferramentas'
     | '/treino'
   fileRoutesById: FileRoutesById
 }
@@ -93,6 +117,7 @@ export interface RootRouteChildren {
   ChecklistRoute: typeof ChecklistRoute
   CorpoRoute: typeof CorpoRoute
   DietaRoute: typeof DietaRoute
+  FerramentasRoute: typeof FerramentasRoute
   TreinoRoute: typeof TreinoRoute
 }
 
@@ -103,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/treino'
       fullPath: '/treino'
       preLoaderRoute: typeof TreinoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ferramentas': {
+      id: '/ferramentas'
+      path: '/ferramentas'
+      fullPath: '/ferramentas'
+      preLoaderRoute: typeof FerramentasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dieta': {
@@ -149,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChecklistRoute: ChecklistRoute,
   CorpoRoute: CorpoRoute,
   DietaRoute: DietaRoute,
+  FerramentasRoute: FerramentasRoute,
   TreinoRoute: TreinoRoute,
 }
 export const routeTree = rootRouteImport
