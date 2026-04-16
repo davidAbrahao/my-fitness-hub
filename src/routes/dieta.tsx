@@ -137,6 +137,19 @@ function DietaPage() {
                 <span className="text-xs font-bold text-foreground">{meal.calories} kcal</span>
               </div>
             </div>
+            
+            {/* Macro estimate per meal */}
+            <div className="flex gap-2 mb-2">
+              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">
+                P: ~{Math.round(meal.calories * (diet.macros.protein.pct / 100) / 4)}g
+              </span>
+              <span className="text-[10px] bg-warning/10 text-warning px-1.5 py-0.5 rounded font-bold">
+                C: ~{Math.round(meal.calories * (diet.macros.carbs.pct / 100) / 4)}g
+              </span>
+              <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded font-bold">
+                G: ~{Math.round(meal.calories * (diet.macros.fat.pct / 100) / 9)}g
+              </span>
+            </div>
             <ul className="space-y-1">
               {meal.items.map((item: string) => (
                 <li key={item} className="text-xs text-secondary-foreground flex items-start gap-2">
