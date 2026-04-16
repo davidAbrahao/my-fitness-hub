@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router';
-import { LayoutDashboard, Dumbbell, UtensilsCrossed, ClipboardCheck, Target, Heart } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, UtensilsCrossed, ClipboardCheck, Target, Heart, Wrench } from 'lucide-react';
 
 const tabs = [
   { to: '/', icon: LayoutDashboard, label: 'Painel' },
@@ -7,7 +7,7 @@ const tabs = [
   { to: '/dieta', icon: UtensilsCrossed, label: 'Dieta' },
   { to: '/checklist', icon: ClipboardCheck, label: 'Check' },
   { to: '/corpo', icon: Target, label: 'Corpo' },
-  { to: '/cardio', icon: Heart, label: 'Cardio' },
+  { to: '/ferramentas', icon: Wrench, label: 'Tools' },
 ] as const;
 
 export function BottomNav() {
