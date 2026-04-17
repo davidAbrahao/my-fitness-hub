@@ -81,35 +81,39 @@ export async function importBackup(payload: BackupPayload, userId: string): Prom
   if (payload.version !== 1) return { ok: false, details: 'Versão de backup não suportada' };
 
   // Strip ids & override user_id, then upsert by natural keys where possible
-  const stripIds = (rows: unknown[]) =>
+  const stripIds = <T extends Record<string, unknown>>(rows: unknown[]): T[] =>
     (rows as Array<Record<string, unknown>>).map(r => {
       const { id: _id, created_at: _c, updated_at: _u, ...rest } = r;
-      return { ...rest, user_id: userId };
+      return { ...rest, user_id: userId } as unknown as T;
     });
 
   const errors: string[] = [];
 
   const bm = stripIds(payload.body_metrics);
   if (bm.length) {
-    const { error } = await supabase.from('body_metrics').insert(bm);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('body_metrics').insert(bm as any);
     if (error) errors.push(`body_metrics: ${error.message}`);
   }
 
   const hl = stripIds(payload.habits_logs);
   if (hl.length) {
-    const { error } = await supabase.from('habits_logs').upsert(hl, { onConflict: 'user_id,date', ignoreDuplicates: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('habits_logs').upsert(hl as any, { onConflict: 'user_id,date', ignoreDuplicates: true });
     if (error) errors.push(`habits_logs: ${error.message}`);
   }
 
   const nl = stripIds(payload.nutrition_logs);
   if (nl.length) {
-    const { error } = await supabase.from('nutrition_logs').upsert(nl, { onConflict: 'user_id,date', ignoreDuplicates: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('nutrition_logs').upsert(nl as any, { onConflict: 'user_id,date', ignoreDuplicates: true });
     if (error) errors.push(`nutrition_logs: ${error.message}`);
   }
 
   const pr = stripIds(payload.personal_records);
   if (pr.length) {
-    const { error } = await supabase.from('personal_records').insert(pr);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await supabase.from('personal_records').insert(pr as any);
     if (error) errors.push(`personal_records: ${error.message}`);
   }
 
