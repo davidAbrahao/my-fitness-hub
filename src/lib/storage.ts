@@ -23,17 +23,15 @@ export function remove(key: string): void {
   localStorage.removeItem(PREFIX + key);
 }
 
-// Date helpers
+// Date helpers — use America/Sao_Paulo timezone (avoids UTC midnight bug)
+import { todayISO, weekStartISO } from './date-utils';
+
 export function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayISO();
 }
 
 export function weekKey(): string {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return monday.toISOString().slice(0, 10);
+  return weekStartISO();
 }
 
 // Types

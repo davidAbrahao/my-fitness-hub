@@ -1,5 +1,9 @@
 import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { BottomNav } from "../components/BottomNav";
+import { AuthProvider, useAuth } from "../lib/auth-context";
+import { AuthGate } from "../components/AuthGate";
+import { migrateLocalToCloud } from "../lib/cloud-sync";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -36,6 +40,25 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  return (
+    <AuthProvider>
+      <AuthGate>
+        <AuthedShell />
+      </AuthGate>
+    </AuthProvider>
+  );
+}
+
+function AuthedShell() {
+  const { user } = useAuth();
+
+  // Auto-migrate localStorage → cloud once per user
+  useEffect(() => {
+    if (user) {
+      migrateLocalToCloud(user.id).catch(console.error);
+    }
+  }, [user]);
+
   return (
     <div className="min-h-screen pb-20">
       <Outlet />
