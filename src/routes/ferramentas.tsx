@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp } from "lucide-react";
+import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   calculate1RM,
@@ -12,6 +12,7 @@ import {
   type PersonalRecord,
 } from "../lib/rm-calculator";
 import { load, save } from "../lib/storage";
+import { AccountPanel } from "../components/AccountPanel";
 
 export const Route = createFileRoute("/ferramentas")({
   component: FerramentasPage,
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/ferramentas")({
   }),
 });
 
-type Tab = "1rm" | "pr" | "bio" | "alt";
+type Tab = "1rm" | "pr" | "bio" | "alt" | "conta";
 
 function FerramentasPage() {
   const [tab, setTab] = useState<Tab>("1rm");
@@ -29,7 +30,8 @@ function FerramentasPage() {
     { id: "1rm", label: "1RM", icon: Calculator },
     { id: "pr", label: "PRs", icon: Trophy },
     { id: "bio", label: "Bio", icon: Bone },
-    { id: "alt", label: "Alternativas", icon: Shuffle },
+    { id: "alt", label: "Alt.", icon: Shuffle },
+    { id: "conta", label: "Conta", icon: UserCog },
   ];
 
   return (
@@ -69,6 +71,7 @@ function FerramentasPage() {
           {tab === "pr" && <PRTracker />}
           {tab === "bio" && <BiomechanicsGuide />}
           {tab === "alt" && <SmartAlternatives />}
+          {tab === "conta" && <div className="px-4"><AccountPanel /></div>}
         </motion.div>
       </AnimatePresence>
     </div>
