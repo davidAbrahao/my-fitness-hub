@@ -21,7 +21,24 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<FoodProduct | null>(null);
   const [grams, setGrams] = useState(100);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
+
+  async function handleBarcode(code: string) {
+    setScanning(false);
+    setScanError(null);
+    setLoading(true);
+    const product = await getByBarcode(code);
+    setLoading(false);
+    if (product) {
+      setSelected(product);
+      setResults([product]);
+      setQuery(product.name);
+    } else {
+      setScanError(`Código ${code} não encontrado no OpenFoodFacts.`);
+    }
+  }
 
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
