@@ -8,6 +8,8 @@ import { Clock, Flame, Lightbulb, Edit3, Plus, Search } from "lucide-react";
 import { EditMealDialog } from "../components/EditMealDialog";
 import type { MealData } from "../components/EditMealDialog";
 import { FoodSearch, type SelectedFood } from "../components/FoodSearch";
+import { useTodayNutrition } from "../lib/cloud-hooks";
+import { NutritionTodayCard } from "../components/NutritionTodayCard";
 
 export const Route = createFileRoute("/dieta")({
   component: DietaPage,
@@ -21,9 +23,11 @@ function DietaPage() {
   const [editMode, setEditMode] = useState(false);
   const [editingMeal, setEditingMeal] = useState<{ meal: MealData | null; index: number; isNew: boolean } | null>(null);
   const [searchTarget, setSearchTarget] = useState<number | null>(null);
+  const { addMeal } = useTodayNutrition();
 
   function handleFoodAdd(item: SelectedFood) {
     if (searchTarget == null) return;
+    const targetMeal = diet.meals[searchTarget];
     const newDiet = { ...diet, meals: [...diet.meals] };
     const meal = { ...newDiet.meals[searchTarget] };
     const label = `${item.food.name} — ${item.grams}g (${item.scaled.calories} kcal, P:${item.scaled.protein}g)`;
@@ -31,6 +35,21 @@ function DietaPage() {
     meal.calories = (meal.calories ?? 0) + item.scaled.calories;
     newDiet.meals[searchTarget] = meal;
     saveDiet(newDiet);
+
+    // Persist consumption to nutrition_logs (cloud, today's date)
+    addMeal({
+      food_id: item.food.id,
+      food_name: item.food.name,
+      brand: item.food.brand ?? null,
+      grams: item.grams,
+      calories: item.scaled.calories,
+      protein: item.scaled.protein,
+      carbs: item.scaled.carbs,
+      fat: item.scaled.fat,
+      meal_index: searchTarget,
+      meal_name: targetMeal?.name,
+      added_at: new Date().toISOString(),
+    });
   }
 
   useEffect(() => {
@@ -69,6 +88,12 @@ function DietaPage() {
   return (
     <div>
       <PageHeader title="DIETA" subtitle={`Meta: ${diet.targetCalories} kcal/dia`} emoji="🍽️" />
+
+      {/* Today's actual consumption (cloud-synced) */}
+      <div className="mb-4">
+        <NutritionTodayCard />
+      </div>
+
 
       {/* Macros */}
       <div className="px-4 mb-4">

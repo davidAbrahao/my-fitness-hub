@@ -1,10 +1,11 @@
 /**
  * Hooks para carregar dados do Supabase (com fallback para localStorage).
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './auth-context';
 import { load } from './storage';
+import { todayISO } from './date-utils';
 import type { BodyLog, DailyCheck } from './storage';
 
 export interface CloudBodyMetric {
@@ -38,6 +39,29 @@ export interface CloudPR {
   date: string;
 }
 
+export interface NutritionMealEntry {
+  food_id: string;
+  food_name: string;
+  brand?: string | null;
+  grams: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meal_index: number;
+  meal_name?: string;
+  added_at: string;
+}
+
+export interface CloudNutritionLog {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  meals: NutritionMealEntry[];
+}
+
 export function useBodyMetrics() {
   const { user } = useAuth();
   const [data, setData] = useState<CloudBodyMetric[]>([]);
@@ -47,7 +71,6 @@ export function useBodyMetrics() {
     let active = true;
     async function fetchData() {
       if (!user) {
-        // fallback local
         const local = load<BodyLog[]>('body_logs', []);
         if (active) {
           setData(
@@ -168,6 +191,185 @@ export function usePersonalRecords() {
       active = false;
     };
   }, [user]);
+
+  return { data, loading };
+}
+
+/**
+ * Hook para a nutrição do dia atual.
+ * - Carrega o registro de hoje
+ * - addMeal() adiciona uma entrada e faz upsert no Supabase
+ */
+export function useTodayNutrition() {
+  const { user } = useAuth();
+  const date = todayISO();
+  const [log, setLog] = useState<CloudNutritionLog>({
+    date,
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    meals: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const { data: row, error } = await supabase
+      .from('nutrition_logs')
+      .select('date, calories, protein, carbs, fat, meals')
+      .eq('user_id', user.id)
+      .eq('date', date)
+      .maybeSingle();
+    if (error) console.error('nutrition fetch:', error);
+    if (row) {
+      setLog({
+        date: row.date,
+        calories: row.calories ?? 0,
+        protein: Number(row.protein ?? 0),
+        carbs: Number(row.carbs ?? 0),
+        fat: Number(row.fat ?? 0),
+        meals: (row.meals as NutritionMealEntry[] | null) ?? [],
+      });
+    } else {
+      setLog({ date, calories: 0, protein: 0, carbs: 0, fat: 0, meals: [] });
+    }
+    setLoading(false);
+  }, [user, date]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const addMeal = useCallback(
+    async (entry: NutritionMealEntry) => {
+      if (!user) return;
+      const newMeals = [...log.meals, entry];
+      const totals = newMeals.reduce(
+        (acc, m) => ({
+          calories: acc.calories + (m.calories || 0),
+          protein: acc.protein + (m.protein || 0),
+          carbs: acc.carbs + (m.carbs || 0),
+          fat: acc.fat + (m.fat || 0),
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      );
+      const next: CloudNutritionLog = {
+        date,
+        calories: Math.round(totals.calories),
+        protein: Math.round(totals.protein * 10) / 10,
+        carbs: Math.round(totals.carbs * 10) / 10,
+        fat: Math.round(totals.fat * 10) / 10,
+        meals: newMeals,
+      };
+      // optimistic
+      setLog(next);
+      const { error } = await supabase
+        .from('nutrition_logs')
+        .upsert(
+          {
+            user_id: user.id,
+            date,
+            calories: next.calories,
+            protein: next.protein,
+            carbs: next.carbs,
+            fat: next.fat,
+            meals: next.meals as any,
+          },
+          { onConflict: 'user_id,date' }
+        );
+      if (error) console.error('nutrition upsert:', error);
+    },
+    [user, log, date]
+  );
+
+  const removeMeal = useCallback(
+    async (addedAt: string) => {
+      if (!user) return;
+      const newMeals = log.meals.filter((m) => m.added_at !== addedAt);
+      const totals = newMeals.reduce(
+        (acc, m) => ({
+          calories: acc.calories + (m.calories || 0),
+          protein: acc.protein + (m.protein || 0),
+          carbs: acc.carbs + (m.carbs || 0),
+          fat: acc.fat + (m.fat || 0),
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      );
+      const next: CloudNutritionLog = {
+        date,
+        calories: Math.round(totals.calories),
+        protein: Math.round(totals.protein * 10) / 10,
+        carbs: Math.round(totals.carbs * 10) / 10,
+        fat: Math.round(totals.fat * 10) / 10,
+        meals: newMeals,
+      };
+      setLog(next);
+      const { error } = await supabase
+        .from('nutrition_logs')
+        .upsert(
+          {
+            user_id: user.id,
+            date,
+            calories: next.calories,
+            protein: next.protein,
+            carbs: next.carbs,
+            fat: next.fat,
+            meals: next.meals as any,
+          },
+          { onConflict: 'user_id,date' }
+        );
+      if (error) console.error('nutrition remove:', error);
+    },
+    [user, log, date]
+  );
+
+  return { log, loading, addMeal, removeMeal, refresh };
+}
+
+/** Histórico (últimos N dias) — para gráficos de evolução de calorias. */
+export function useNutritionHistory(days = 14) {
+  const { user } = useAuth();
+  const [data, setData] = useState<CloudNutritionLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchData() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const sinceISO = since.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const { data: rows, error } = await supabase
+        .from('nutrition_logs')
+        .select('date, calories, protein, carbs, fat, meals')
+        .gte('date', sinceISO)
+        .order('date', { ascending: true });
+      if (!active) return;
+      if (error) console.error('nutrition history:', error);
+      setData(
+        (rows ?? []).map((r) => ({
+          date: r.date,
+          calories: r.calories ?? 0,
+          protein: Number(r.protein ?? 0),
+          carbs: Number(r.carbs ?? 0),
+          fat: Number(r.fat ?? 0),
+          meals: (r.meals as NutritionMealEntry[] | null) ?? [],
+        }))
+      );
+      setLoading(false);
+    }
+    fetchData();
+    return () => {
+      active = false;
+    };
+  }, [user, days]);
 
   return { data, loading };
 }
