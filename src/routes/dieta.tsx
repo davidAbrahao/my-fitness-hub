@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { defaultDietPlan } from "../lib/training-data";
 import { load, save } from "../lib/storage";
-import { Clock, Flame, Lightbulb, Edit3, Plus } from "lucide-react";
+import { Clock, Flame, Lightbulb, Edit3, Plus, Search } from "lucide-react";
 import { EditMealDialog } from "../components/EditMealDialog";
 import type { MealData } from "../components/EditMealDialog";
+import { FoodSearch, type SelectedFood } from "../components/FoodSearch";
 
 export const Route = createFileRoute("/dieta")({
   component: DietaPage,
@@ -19,6 +20,18 @@ function DietaPage() {
   const [diet, setDiet] = useState(defaultDietPlan);
   const [editMode, setEditMode] = useState(false);
   const [editingMeal, setEditingMeal] = useState<{ meal: MealData | null; index: number; isNew: boolean } | null>(null);
+  const [searchTarget, setSearchTarget] = useState<number | null>(null);
+
+  function handleFoodAdd(item: SelectedFood) {
+    if (searchTarget == null) return;
+    const newDiet = { ...diet, meals: [...diet.meals] };
+    const meal = { ...newDiet.meals[searchTarget] };
+    const label = `${item.food.name} — ${item.grams}g (${item.scaled.calories} kcal, P:${item.scaled.protein}g)`;
+    meal.items = [...meal.items, label];
+    meal.calories = (meal.calories ?? 0) + item.scaled.calories;
+    newDiet.meals[searchTarget] = meal;
+    saveDiet(newDiet);
+  }
 
   useEffect(() => {
     const custom = load<typeof defaultDietPlan | null>('custom_diet_plan', null);
@@ -138,9 +151,18 @@ function DietaPage() {
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-1">
-                <Flame size={12} className="text-destructive" />
-                <span className="text-xs font-bold text-foreground">{meal.calories} kcal</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSearchTarget(i)}
+                  className="text-primary hover:scale-110 transition-transform"
+                  title="Buscar alimento"
+                >
+                  <Search size={12} />
+                </button>
+                <div className="flex items-center gap-1">
+                  <Flame size={12} className="text-destructive" />
+                  <span className="text-xs font-bold text-foreground">{meal.calories} kcal</span>
+                </div>
               </div>
             </div>
             
@@ -195,6 +217,16 @@ function DietaPage() {
             onSave={handleSaveMeal}
             onDelete={editingMeal.isNew ? undefined : () => handleDeleteMeal(editingMeal.index)}
             onClose={() => setEditingMeal(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Food Search */}
+      <AnimatePresence>
+        {searchTarget !== null && (
+          <FoodSearch
+            onAdd={handleFoodAdd}
+            onClose={() => setSearchTarget(null)}
           />
         )}
       </AnimatePresence>
