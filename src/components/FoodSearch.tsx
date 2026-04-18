@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Plus, Loader2, Apple } from 'lucide-react';
-import { searchFoods, scaleNutrients, type FoodProduct } from '../lib/openfoodfacts';
+import { Search, X, Plus, Loader2, Apple, ScanBarcode } from 'lucide-react';
+import { searchFoods, getByBarcode, scaleNutrients, type FoodProduct } from '../lib/openfoodfacts';
+import { BarcodeScanner } from './BarcodeScanner';
 
 export interface SelectedFood {
   food: FoodProduct;
@@ -20,7 +21,24 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<FoodProduct | null>(null);
   const [grams, setGrams] = useState(100);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const debounceRef = useRef<number | undefined>(undefined);
+
+  async function handleBarcode(code: string) {
+    setScanning(false);
+    setScanError(null);
+    setLoading(true);
+    const product = await getByBarcode(code);
+    setLoading(false);
+    if (product) {
+      setSelected(product);
+      setResults([product]);
+      setQuery(product.name);
+    } else {
+      setScanError(`Código ${code} não encontrado no OpenFoodFacts.`);
+    }
+  }
 
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -67,21 +85,33 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
         </button>
       </div>
 
-      {/* Search input */}
+      {/* Search input + scan */}
       <div className="px-4 py-3">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ex: arroz, frango, banana..."
-            autoFocus
-            className="w-full bg-input text-foreground text-sm pl-9 pr-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-primary"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ex: arroz, frango, banana..."
+              autoFocus
+              className="w-full bg-input text-foreground text-sm pl-9 pr-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <button
+            onClick={() => { setScanError(null); setScanning(true); }}
+            className="bg-primary text-primary-foreground font-bold text-sm px-3 rounded-lg flex items-center gap-1"
+            title="Escanear código de barras"
+          >
+            <ScanBarcode size={16} />
+          </button>
         </div>
+        {scanError && (
+          <p className="text-[10px] text-destructive mt-1.5">{scanError}</p>
+        )}
         <p className="text-[10px] text-muted-foreground mt-1.5">
           Dados de OpenFoodFacts (por 100g) — pode ter variação.
         </p>
@@ -209,6 +239,16 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
               <Plus size={16} /> Adicionar à Refeição
             </button>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Barcode Scanner */}
+      <AnimatePresence>
+        {scanning && (
+          <BarcodeScanner
+            onDetected={handleBarcode}
+            onClose={() => setScanning(false)}
+          />
         )}
       </AnimatePresence>
     </motion.div>
