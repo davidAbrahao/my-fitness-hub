@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Plus, Loader2, Apple } from 'lucide-react';
-import { searchFoods, scaleNutrients, type FoodProduct } from '../lib/openfoodfacts';
+import { Search, X, Plus, Loader2, Apple, ScanBarcode } from 'lucide-react';
+import { searchFoods, getByBarcode, scaleNutrients, type FoodProduct } from '../lib/openfoodfacts';
+import { BarcodeScanner } from './BarcodeScanner';
 
 export interface SelectedFood {
   food: FoodProduct;
