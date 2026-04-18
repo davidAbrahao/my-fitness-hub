@@ -151,9 +151,18 @@ function DietaPage() {
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-1">
-                <Flame size={12} className="text-destructive" />
-                <span className="text-xs font-bold text-foreground">{meal.calories} kcal</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSearchTarget(i)}
+                  className="text-primary hover:scale-110 transition-transform"
+                  title="Buscar alimento"
+                >
+                  <Search size={12} />
+                </button>
+                <div className="flex items-center gap-1">
+                  <Flame size={12} className="text-destructive" />
+                  <span className="text-xs font-bold text-foreground">{meal.calories} kcal</span>
+                </div>
               </div>
             </div>
             
@@ -208,6 +217,16 @@ function DietaPage() {
             onSave={handleSaveMeal}
             onDelete={editingMeal.isNew ? undefined : () => handleDeleteMeal(editingMeal.index)}
             onClose={() => setEditingMeal(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Food Search */}
+      <AnimatePresence>
+        {searchTarget !== null && (
+          <FoodSearch
+            onAdd={handleFoodAdd}
+            onClose={() => setSearchTarget(null)}
           />
         )}
       </AnimatePresence>
