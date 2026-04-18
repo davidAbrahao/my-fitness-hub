@@ -241,6 +241,16 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Barcode Scanner */}
+      <AnimatePresence>
+        {scanning && (
+          <BarcodeScanner
+            onDetected={handleBarcode}
+            onClose={() => setScanning(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
