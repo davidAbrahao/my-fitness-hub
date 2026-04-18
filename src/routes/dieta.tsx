@@ -89,6 +89,12 @@ function DietaPage() {
     <div>
       <PageHeader title="DIETA" subtitle={`Meta: ${diet.targetCalories} kcal/dia`} emoji="🍽️" />
 
+      {/* Today's actual consumption (cloud-synced) */}
+      <div className="mb-4">
+        <NutritionTodayCard />
+      </div>
+
+
       {/* Macros */}
       <div className="px-4 mb-4">
         <div className="glass-card p-4">

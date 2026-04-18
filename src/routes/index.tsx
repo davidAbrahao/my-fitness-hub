@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { AdvancedDashboard } from "../components/AdvancedDashboard";
+import { NutritionTodayCard } from "../components/NutritionTodayCard";
 import { load, todayKey } from "../lib/storage";
 import type { DailyCheck } from "../lib/storage";
 import { Dumbbell, Flame, Moon, Droplets, Activity } from "lucide-react";
@@ -74,8 +75,14 @@ function Dashboard() {
         </motion.div>
       </div>
 
+      {/* Today's nutrition (cloud) */}
+      <div className="mb-4">
+        <NutritionTodayCard />
+      </div>
+
       {/* Advanced Dashboard with charts + cloud data */}
       <AdvancedDashboard />
+
     </div>
   );
 }
