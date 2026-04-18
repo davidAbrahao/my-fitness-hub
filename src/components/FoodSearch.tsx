@@ -85,21 +85,33 @@ export function FoodSearch({ onAdd, onClose }: FoodSearchProps) {
         </button>
       </div>
 
-      {/* Search input */}
+      {/* Search input + scan */}
       <div className="px-4 py-3">
-        <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ex: arroz, frango, banana..."
-            autoFocus
-            className="w-full bg-input text-foreground text-sm pl-9 pr-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-primary"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Ex: arroz, frango, banana..."
+              autoFocus
+              className="w-full bg-input text-foreground text-sm pl-9 pr-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+          <button
+            onClick={() => { setScanError(null); setScanning(true); }}
+            className="bg-primary text-primary-foreground font-bold text-sm px-3 rounded-lg flex items-center gap-1"
+            title="Escanear código de barras"
+          >
+            <ScanBarcode size={16} />
+          </button>
         </div>
+        {scanError && (
+          <p className="text-[10px] text-destructive mt-1.5">{scanError}</p>
+        )}
         <p className="text-[10px] text-muted-foreground mt-1.5">
           Dados de OpenFoodFacts (por 100g) — pode ter variação.
         </p>
