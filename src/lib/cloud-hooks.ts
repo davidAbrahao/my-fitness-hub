@@ -185,42 +185,84 @@ export function usePersonalRecords() {
   const [data, setData] = useState<CloudPR[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function fetchData() {
-      if (!user) {
-        const local = load<any[]>('personal_records', []);
-        if (active) {
-          setData(
-            local.map((p) => ({
-              exercise_id: p.exerciseId ?? p.exercise_id ?? '',
-              exercise_name: p.exerciseName ?? p.exercise_name ?? '',
-              weight: p.weight,
-              reps: p.reps,
-              estimated_1rm: p.estimated1RM ?? p.estimated_1rm ?? 0,
-              date: p.date,
-            }))
-          );
-          setLoading(false);
-        }
-        return;
-      }
-      const { data: rows, error } = await supabase
-        .from('personal_records')
-        .select('exercise_id, exercise_name, weight, reps, estimated_1rm, date')
-        .order('date', { ascending: true });
-      if (!active) return;
-      if (error) console.error('PR fetch:', error);
-      setData((rows ?? []) as CloudPR[]);
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      const local = load<Array<Record<string, unknown>>>('personal_records', []);
+      setData(
+        local.map((p) => ({
+          exercise_id: (p.exerciseId ?? p.exercise_id ?? '') as string,
+          exercise_name: (p.exerciseName ?? p.exercise_name ?? '') as string,
+          weight: Number(p.weight),
+          reps: Number(p.reps),
+          estimated_1rm: Number(p.estimated1RM ?? p.estimated_1rm ?? 0),
+          date: p.date as string,
+        }))
+      );
       setLoading(false);
+      return;
     }
-    fetchData();
-    return () => {
-      active = false;
-    };
+    const { data: rows, error } = await supabase
+      .from('personal_records')
+      .select('exercise_id, exercise_name, weight, reps, estimated_1rm, date')
+      .order('date', { ascending: true });
+    if (error) console.error('PR fetch:', error);
+    setData((rows ?? []) as CloudPR[]);
+    setLoading(false);
   }, [user]);
 
-  return { data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const addPR = useCallback(
+    async (pr: CloudPR) => {
+      setData((prev) => {
+        const next = [...prev, pr].sort((a, b) => a.date.localeCompare(b.date));
+        save(
+          'personal_records',
+          next.map((p) => ({
+            exerciseId: p.exercise_id,
+            exerciseName: p.exercise_name,
+            weight: p.weight,
+            reps: p.reps,
+            estimated1RM: p.estimated_1rm,
+            date: p.date,
+          }))
+        );
+        return next;
+      });
+      if (!user) return;
+      await enqueue({
+        table: 'personal_records',
+        payload: { user_id: user.id, ...pr },
+      });
+    },
+    [user]
+  );
+
+  const removePR = useCallback(
+    async (pr: CloudPR) => {
+      setData((prev) =>
+        prev.filter(
+          (p) =>
+            !(p.date === pr.date && p.exercise_name === pr.exercise_name && p.weight === pr.weight && p.reps === pr.reps)
+        )
+      );
+      if (!user) return;
+      const { error } = await supabase
+        .from('personal_records')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('exercise_name', pr.exercise_name)
+        .eq('date', pr.date)
+        .eq('weight', pr.weight)
+        .eq('reps', pr.reps);
+      if (error) console.error('PR delete:', error);
+    },
+    [user]
+  );
+
+  return { data, loading, addPR, removePR, refresh: fetchData };
 }
 
 /**
