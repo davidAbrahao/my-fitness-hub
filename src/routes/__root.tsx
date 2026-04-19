@@ -4,6 +4,8 @@ import { BottomNav } from "../components/BottomNav";
 import { AuthProvider, useAuth } from "../lib/auth-context";
 import { AuthGate } from "../components/AuthGate";
 import { migrateLocalToCloud } from "../lib/cloud-sync";
+import { initOfflineQueue } from "../lib/offline-queue";
+import { Toaster } from "../components/ui/sonner";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -52,6 +54,11 @@ function RootComponent() {
 function AuthedShell() {
   const { user } = useAuth();
 
+  // Init offline retry queue once
+  useEffect(() => {
+    initOfflineQueue();
+  }, []);
+
   // Auto-migrate localStorage → cloud once per user
   useEffect(() => {
     if (user) {
@@ -63,6 +70,7 @@ function AuthedShell() {
     <div className="min-h-screen pb-20">
       <Outlet />
       <BottomNav />
+      <Toaster position="top-center" theme="dark" />
     </div>
   );
 }
