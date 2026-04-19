@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './auth-context';
-import { load } from './storage';
+import { load, save } from './storage';
 import { todayISO } from './date-utils';
+import { enqueue } from './offline-queue';
 import type { BodyLog, DailyCheck } from './storage';
 
 export interface CloudBodyMetric {
