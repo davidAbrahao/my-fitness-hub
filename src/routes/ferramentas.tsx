@@ -1,18 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog } from "lucide-react";
+import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog, Bell } from "lucide-react";
+import { RemindersPanel } from "../components/RemindersPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   calculate1RM,
   percentageZones,
   biomechanicsData,
   smartAlternatives,
-  type PersonalRecord,
 } from "../lib/rm-calculator";
-import { load, save } from "../lib/storage";
+import { usePersonalRecords, type CloudPR } from "../lib/cloud-hooks";
+import { todayISO } from "../lib/date-utils";
 import { AccountPanel } from "../components/AccountPanel";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/ferramentas")({
   component: FerramentasPage,
@@ -21,7 +23,7 @@ export const Route = createFileRoute("/ferramentas")({
   }),
 });
 
-type Tab = "1rm" | "pr" | "bio" | "alt" | "conta";
+type Tab = "1rm" | "pr" | "bio" | "alt" | "lemb" | "conta";
 
 function FerramentasPage() {
   const [tab, setTab] = useState<Tab>("1rm");
@@ -31,6 +33,7 @@ function FerramentasPage() {
     { id: "pr", label: "PRs", icon: Trophy },
     { id: "bio", label: "Bio", icon: Bone },
     { id: "alt", label: "Alt.", icon: Shuffle },
+    { id: "lemb", label: "Sino", icon: Bell },
     { id: "conta", label: "Conta", icon: UserCog },
   ];
 
@@ -71,6 +74,7 @@ function FerramentasPage() {
           {tab === "pr" && <PRTracker />}
           {tab === "bio" && <BiomechanicsGuide />}
           {tab === "alt" && <SmartAlternatives />}
+          {tab === "lemb" && <div className="px-4"><RemindersPanel /></div>}
           {tab === "conta" && <div className="px-4"><AccountPanel /></div>}
         </motion.div>
       </AnimatePresence>
@@ -170,56 +174,46 @@ function RMCalculator() {
 
 /* ───────────── PR Tracker ───────────── */
 function PRTracker() {
-  const [prs, setPrs] = useState<PersonalRecord[]>([]);
+  const { data: prs, addPR, removePR } = usePersonalRecords();
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
 
-  useEffect(() => {
-    setPrs(load<PersonalRecord[]>("personal_records", []));
-  }, []);
-
-  function addPR() {
+  async function handleAdd() {
     const w = parseFloat(weight);
     const r = parseInt(reps);
-    if (!name.trim() || w <= 0 || r <= 0) return;
-
+    if (!name.trim() || w <= 0 || r <= 0) {
+      toast.error("Preencha nome, peso e reps");
+      return;
+    }
     const { average } = calculate1RM(w, r);
-    const record: PersonalRecord = {
-      exerciseId: name.toLowerCase().replace(/\s+/g, "_"),
-      exerciseName: name.trim(),
+    const record: CloudPR = {
+      exercise_id: name.toLowerCase().replace(/\s+/g, "_"),
+      exercise_name: name.trim(),
       weight: w,
       reps: r,
-      estimated1RM: average,
-      date: new Date().toISOString().slice(0, 10),
+      estimated_1rm: average,
+      date: todayISO(),
     };
-
-    const updated = [record, ...prs];
-    setPrs(updated);
-    save("personal_records", updated);
+    await addPR(record);
+    toast.success(`🏆 PR salvo: ${record.exercise_name} ${w}kg × ${r}`);
     setName("");
     setWeight("");
     setReps("");
   }
 
-  function removePR(index: number) {
-    const updated = prs.filter((_, i) => i !== index);
-    setPrs(updated);
-    save("personal_records", updated);
-  }
-
   // Group by exercise, show best 1RM
   const grouped = useMemo(() => {
-    const map = new Map<string, PersonalRecord[]>();
+    const map = new Map<string, CloudPR[]>();
     prs.forEach((pr) => {
-      const key = pr.exerciseName;
+      const key = pr.exercise_name;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(pr);
     });
     return Array.from(map.entries()).map(([name, records]) => ({
       name,
-      best: records.reduce((a, b) => (a.estimated1RM > b.estimated1RM ? a : b)),
-      records: records.sort((a, b) => b.date.localeCompare(a.date)),
+      best: records.reduce((a, b) => (a.estimated_1rm > b.estimated_1rm ? a : b)),
+      records: records.slice().sort((a, b) => b.date.localeCompare(a.date)),
     }));
   }, [prs]);
 
@@ -252,7 +246,7 @@ function PRTracker() {
             />
           </div>
           <button
-            onClick={addPR}
+            onClick={handleAdd}
             className="w-full bg-primary text-primary-foreground font-bold text-sm py-2.5 rounded-lg"
           >
             Salvar PR
@@ -264,7 +258,7 @@ function PRTracker() {
       {grouped.map(({ name, best, records }) => {
         const chartData = [...records].reverse().map(r => ({
           date: r.date.slice(5),
-          '1RM': r.estimated1RM,
+          '1RM': r.estimated_1rm,
           peso: r.weight,
         }));
 
@@ -274,7 +268,7 @@ function PRTracker() {
               <div>
                 <span className="text-sm font-bold text-foreground">{name}</span>
                 <div className="text-xs text-primary font-bold">
-                  🏅 Melhor 1RM: {best.estimated1RM} kg
+                  🏅 Melhor 1RM: {best.estimated_1rm} kg
                 </div>
               </div>
               <Trophy size={20} className="text-warning" />
@@ -314,11 +308,11 @@ function PRTracker() {
 
             <div className="space-y-1">
               {records.map((r, i) => (
-                <div key={i} className="flex items-center justify-between text-xs bg-secondary rounded-lg px-3 py-2">
+                <div key={`${r.date}-${i}`} className="flex items-center justify-between text-xs bg-secondary rounded-lg px-3 py-2">
                   <span className="text-muted-foreground">{r.date}</span>
                   <span className="text-foreground font-bold">{r.weight}kg × {r.reps} reps</span>
-                  <span className="text-primary font-bold">~{r.estimated1RM}kg</span>
-                  <button onClick={() => removePR(prs.indexOf(r))} className="text-destructive ml-2">
+                  <span className="text-primary font-bold">~{r.estimated_1rm}kg</span>
+                  <button onClick={() => removePR(r)} className="text-destructive ml-2">
                     <Trash2 size={12} />
                   </button>
                 </div>

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { AdvancedDashboard } from "../components/AdvancedDashboard";
 import { NutritionTodayCard } from "../components/NutritionTodayCard";
+import { AIInsightsCard } from "../components/AIInsightsCard";
 import { load, todayKey } from "../lib/storage";
 import type { DailyCheck } from "../lib/storage";
 import { Dumbbell, Flame, Moon, Droplets, Activity } from "lucide-react";
@@ -82,6 +83,11 @@ function Dashboard() {
 
       {/* Advanced Dashboard with charts + cloud data */}
       <AdvancedDashboard />
+
+      {/* AI weekly insights */}
+      <div className="mb-4 mt-2">
+        <AIInsightsCard />
+      </div>
 
     </div>
   );

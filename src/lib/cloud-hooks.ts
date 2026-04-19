@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './auth-context';
-import { load } from './storage';
+import { load, save } from './storage';
 import { todayISO } from './date-utils';
+import { enqueue } from './offline-queue';
 import type { BodyLog, DailyCheck } from './storage';
 
 export interface CloudBodyMetric {
@@ -67,44 +68,71 @@ export function useBodyMetrics() {
   const [data, setData] = useState<CloudBodyMetric[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function fetchData() {
-      if (!user) {
-        const local = load<BodyLog[]>('body_logs', []);
-        if (active) {
-          setData(
-            local.map((b) => ({
-              date: b.date,
-              weight: b.weight ?? null,
-              waist: b.waist ?? null,
-              chest: b.chest ?? null,
-              arm: b.arm ?? null,
-              thigh: b.thigh ?? null,
-              hip: b.hip ?? null,
-              body_fat: b.bf ?? null,
-            }))
-          );
-          setLoading(false);
-        }
-        return;
-      }
-      const { data: rows, error } = await supabase
-        .from('body_metrics')
-        .select('date, weight, waist, chest, arm, thigh, hip, body_fat')
-        .order('date', { ascending: true });
-      if (!active) return;
-      if (error) console.error('body_metrics fetch:', error);
-      setData((rows ?? []) as CloudBodyMetric[]);
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      const local = load<BodyLog[]>('body_logs', []);
+      setData(
+        local.map((b) => ({
+          date: b.date,
+          weight: b.weight ?? null,
+          waist: b.waist ?? null,
+          chest: b.chest ?? null,
+          arm: b.arm ?? null,
+          thigh: b.thigh ?? null,
+          hip: b.hip ?? null,
+          body_fat: b.bf ?? null,
+        }))
+      );
       setLoading(false);
+      return;
     }
-    fetchData();
-    return () => {
-      active = false;
-    };
+    const { data: rows, error } = await supabase
+      .from('body_metrics')
+      .select('date, weight, waist, chest, arm, thigh, hip, body_fat')
+      .order('date', { ascending: true });
+    if (error) console.error('body_metrics fetch:', error);
+    setData((rows ?? []) as CloudBodyMetric[]);
+    setLoading(false);
   }, [user]);
 
-  return { data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /** Adiciona/atualiza medida com UI otimista + fila offline. */
+  const upsertMetric = useCallback(
+    async (metric: Omit<CloudBodyMetric, never> & { photo_url?: string | null }) => {
+      // optimistic local update
+      setData((prev) => {
+        const filtered = prev.filter((m) => m.date !== metric.date);
+        const next = [...filtered, metric].sort((a, b) => a.date.localeCompare(b.date));
+        // mantém cache local também
+        save(
+          'body_logs',
+          next.map((b) => ({
+            date: b.date,
+            weight: b.weight ?? undefined,
+            waist: b.waist ?? undefined,
+            chest: b.chest ?? undefined,
+            arm: b.arm ?? undefined,
+            thigh: b.thigh ?? undefined,
+            hip: b.hip ?? undefined,
+            bf: b.body_fat ?? undefined,
+          }))
+        );
+        return next;
+      });
+      if (!user) return;
+      await enqueue({
+        table: 'body_metrics',
+        payload: { user_id: user.id, ...metric },
+        onConflict: 'user_id,date',
+      });
+    },
+    [user]
+  );
+
+  return { data, loading, upsertMetric, refresh: fetchData };
 }
 
 export function useHabits() {
@@ -157,42 +185,84 @@ export function usePersonalRecords() {
   const [data, setData] = useState<CloudPR[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function fetchData() {
-      if (!user) {
-        const local = load<any[]>('personal_records', []);
-        if (active) {
-          setData(
-            local.map((p) => ({
-              exercise_id: p.exerciseId ?? p.exercise_id ?? '',
-              exercise_name: p.exerciseName ?? p.exercise_name ?? '',
-              weight: p.weight,
-              reps: p.reps,
-              estimated_1rm: p.estimated1RM ?? p.estimated_1rm ?? 0,
-              date: p.date,
-            }))
-          );
-          setLoading(false);
-        }
-        return;
-      }
-      const { data: rows, error } = await supabase
-        .from('personal_records')
-        .select('exercise_id, exercise_name, weight, reps, estimated_1rm, date')
-        .order('date', { ascending: true });
-      if (!active) return;
-      if (error) console.error('PR fetch:', error);
-      setData((rows ?? []) as CloudPR[]);
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      const local = load<Array<Record<string, unknown>>>('personal_records', []);
+      setData(
+        local.map((p) => ({
+          exercise_id: (p.exerciseId ?? p.exercise_id ?? '') as string,
+          exercise_name: (p.exerciseName ?? p.exercise_name ?? '') as string,
+          weight: Number(p.weight),
+          reps: Number(p.reps),
+          estimated_1rm: Number(p.estimated1RM ?? p.estimated_1rm ?? 0),
+          date: p.date as string,
+        }))
+      );
       setLoading(false);
+      return;
     }
-    fetchData();
-    return () => {
-      active = false;
-    };
+    const { data: rows, error } = await supabase
+      .from('personal_records')
+      .select('exercise_id, exercise_name, weight, reps, estimated_1rm, date')
+      .order('date', { ascending: true });
+    if (error) console.error('PR fetch:', error);
+    setData((rows ?? []) as CloudPR[]);
+    setLoading(false);
   }, [user]);
 
-  return { data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const addPR = useCallback(
+    async (pr: CloudPR) => {
+      setData((prev) => {
+        const next = [...prev, pr].sort((a, b) => a.date.localeCompare(b.date));
+        save(
+          'personal_records',
+          next.map((p) => ({
+            exerciseId: p.exercise_id,
+            exerciseName: p.exercise_name,
+            weight: p.weight,
+            reps: p.reps,
+            estimated1RM: p.estimated_1rm,
+            date: p.date,
+          }))
+        );
+        return next;
+      });
+      if (!user) return;
+      await enqueue({
+        table: 'personal_records',
+        payload: { user_id: user.id, ...pr },
+      });
+    },
+    [user]
+  );
+
+  const removePR = useCallback(
+    async (pr: CloudPR) => {
+      setData((prev) =>
+        prev.filter(
+          (p) =>
+            !(p.date === pr.date && p.exercise_name === pr.exercise_name && p.weight === pr.weight && p.reps === pr.reps)
+        )
+      );
+      if (!user) return;
+      const { error } = await supabase
+        .from('personal_records')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('exercise_name', pr.exercise_name)
+        .eq('date', pr.date)
+        .eq('weight', pr.weight)
+        .eq('reps', pr.reps);
+      if (error) console.error('PR delete:', error);
+    },
+    [user]
+  );
+
+  return { data, loading, addPR, removePR, refresh: fetchData };
 }
 
 /**
