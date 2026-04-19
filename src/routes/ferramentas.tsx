@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog } from "lucide-react";
+import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog, Bell } from "lucide-react";
+import { RemindersPanel } from "../components/RemindersPanel";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   calculate1RM,
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/ferramentas")({
   }),
 });
 
-type Tab = "1rm" | "pr" | "bio" | "alt" | "conta";
+type Tab = "1rm" | "pr" | "bio" | "alt" | "lemb" | "conta";
 
 function FerramentasPage() {
   const [tab, setTab] = useState<Tab>("1rm");
@@ -32,6 +33,7 @@ function FerramentasPage() {
     { id: "pr", label: "PRs", icon: Trophy },
     { id: "bio", label: "Bio", icon: Bone },
     { id: "alt", label: "Alt.", icon: Shuffle },
+    { id: "lemb", label: "Sino", icon: Bell },
     { id: "conta", label: "Conta", icon: UserCog },
   ];
 
@@ -72,6 +74,7 @@ function FerramentasPage() {
           {tab === "pr" && <PRTracker />}
           {tab === "bio" && <BiomechanicsGuide />}
           {tab === "alt" && <SmartAlternatives />}
+          {tab === "lemb" && <div className="px-4"><RemindersPanel /></div>}
           {tab === "conta" && <div className="px-4"><AccountPanel /></div>}
         </motion.div>
       </AnimatePresence>
