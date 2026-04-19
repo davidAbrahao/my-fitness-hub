@@ -68,44 +68,71 @@ export function useBodyMetrics() {
   const [data, setData] = useState<CloudBodyMetric[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function fetchData() {
-      if (!user) {
-        const local = load<BodyLog[]>('body_logs', []);
-        if (active) {
-          setData(
-            local.map((b) => ({
-              date: b.date,
-              weight: b.weight ?? null,
-              waist: b.waist ?? null,
-              chest: b.chest ?? null,
-              arm: b.arm ?? null,
-              thigh: b.thigh ?? null,
-              hip: b.hip ?? null,
-              body_fat: b.bf ?? null,
-            }))
-          );
-          setLoading(false);
-        }
-        return;
-      }
-      const { data: rows, error } = await supabase
-        .from('body_metrics')
-        .select('date, weight, waist, chest, arm, thigh, hip, body_fat')
-        .order('date', { ascending: true });
-      if (!active) return;
-      if (error) console.error('body_metrics fetch:', error);
-      setData((rows ?? []) as CloudBodyMetric[]);
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      const local = load<BodyLog[]>('body_logs', []);
+      setData(
+        local.map((b) => ({
+          date: b.date,
+          weight: b.weight ?? null,
+          waist: b.waist ?? null,
+          chest: b.chest ?? null,
+          arm: b.arm ?? null,
+          thigh: b.thigh ?? null,
+          hip: b.hip ?? null,
+          body_fat: b.bf ?? null,
+        }))
+      );
       setLoading(false);
+      return;
     }
-    fetchData();
-    return () => {
-      active = false;
-    };
+    const { data: rows, error } = await supabase
+      .from('body_metrics')
+      .select('date, weight, waist, chest, arm, thigh, hip, body_fat')
+      .order('date', { ascending: true });
+    if (error) console.error('body_metrics fetch:', error);
+    setData((rows ?? []) as CloudBodyMetric[]);
+    setLoading(false);
   }, [user]);
 
-  return { data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /** Adiciona/atualiza medida com UI otimista + fila offline. */
+  const upsertMetric = useCallback(
+    async (metric: Omit<CloudBodyMetric, never> & { photo_url?: string | null }) => {
+      // optimistic local update
+      setData((prev) => {
+        const filtered = prev.filter((m) => m.date !== metric.date);
+        const next = [...filtered, metric].sort((a, b) => a.date.localeCompare(b.date));
+        // mantém cache local também
+        save(
+          'body_logs',
+          next.map((b) => ({
+            date: b.date,
+            weight: b.weight ?? undefined,
+            waist: b.waist ?? undefined,
+            chest: b.chest ?? undefined,
+            arm: b.arm ?? undefined,
+            thigh: b.thigh ?? undefined,
+            hip: b.hip ?? undefined,
+            bf: b.body_fat ?? undefined,
+          }))
+        );
+        return next;
+      });
+      if (!user) return;
+      await enqueue({
+        table: 'body_metrics',
+        payload: { user_id: user.id, ...metric },
+        onConflict: 'user_id,date',
+      });
+    },
+    [user]
+  );
+
+  return { data, loading, upsertMetric, refresh: fetchData };
 }
 
 export function useHabits() {
