@@ -140,44 +140,166 @@ export function useHabits() {
   const [data, setData] = useState<CloudHabit[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let active = true;
-    async function fetchData() {
-      if (!user) {
-        const local = load<DailyCheck[]>('daily_checks', []);
-        if (active) {
-          setData(
-            local.map((c) => ({
-              date: c.date,
-              workout_done: !!c.treino,
-              diet_ok: !!c.dieta,
-              water: !!c.agua,
-              cardio: !!c.cardio,
-              supplements: !!c.suplementos,
-              creatine: false,
-              sleep_hours: c.sono ? 7 : null,
-            }))
-          );
-          setLoading(false);
-        }
-        return;
-      }
-      const { data: rows, error } = await supabase
-        .from('habits_logs')
-        .select('date, workout_done, diet_ok, water, cardio, supplements, creatine, sleep_hours')
-        .order('date', { ascending: true });
-      if (!active) return;
-      if (error) console.error('habits fetch:', error);
-      setData((rows ?? []) as CloudHabit[]);
+  const fetchData = useCallback(async () => {
+    if (!user) {
+      const local = load<DailyCheck[]>('daily_checks', []);
+      setData(
+        local.map((c) => ({
+          date: c.date,
+          workout_done: !!c.treino,
+          diet_ok: !!c.dieta,
+          water: !!c.agua,
+          cardio: !!c.cardio,
+          supplements: !!c.suplementos,
+          creatine: false,
+          sleep_hours: c.sono ? 7 : null,
+        }))
+      );
       setLoading(false);
+      return;
     }
-    fetchData();
-    return () => {
-      active = false;
-    };
+    const { data: rows, error } = await supabase
+      .from('habits_logs')
+      .select('date, workout_done, diet_ok, water, cardio, supplements, creatine, sleep_hours')
+      .order('date', { ascending: true });
+    if (error) console.error('habits fetch:', error);
+    setData((rows ?? []) as CloudHabit[]);
+    setLoading(false);
   }, [user]);
 
-  return { data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /** Upsert otimista de hábitos do dia, com fila offline. */
+  const upsertHabit = useCallback(
+    async (habit: CloudHabit) => {
+      setData((prev) => {
+        const filtered = prev.filter((h) => h.date !== habit.date);
+        const next = [...filtered, habit].sort((a, b) => a.date.localeCompare(b.date));
+        // mantém cache local também (formato legado)
+        save(
+          'daily_checks',
+          next.map((h) => ({
+            date: h.date,
+            treino: h.workout_done,
+            dieta: h.diet_ok,
+            sono: !!h.sleep_hours && h.sleep_hours >= 7,
+            agua: h.water,
+            cardio: h.cardio,
+            suplementos: h.supplements,
+            notes: '',
+          }))
+        );
+        return next;
+      });
+      if (!user) return;
+      await enqueue({
+        table: 'habits_logs',
+        payload: { user_id: user.id, ...habit },
+        onConflict: 'user_id,date',
+      });
+    },
+    [user]
+  );
+
+  return { data, loading, upsertHabit, refresh: fetchData };
+}
+
+/* ──────────── Workouts (treino do dia) ──────────── */
+export interface CloudWorkoutSet { reps: number; weight: number }
+export interface CloudExerciseLog {
+  exercise_id: string;
+  exercise_name: string;
+  sets: CloudWorkoutSet[];
+}
+
+/**
+ * Persiste o treino do dia em `workouts` (1 por data) + `exercises_logs` (N por workout).
+ * Usa fila offline com UI otimista.
+ */
+export function useTodayWorkout(workoutType: string) {
+  const { user } = useAuth();
+  const date = todayISO();
+  const [exerciseLogs, setExerciseLogs] = useState<CloudExerciseLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [workoutId, setWorkoutId] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const { data: w } = await supabase
+      .from('workouts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('date', date)
+      .maybeSingle();
+    if (w) {
+      setWorkoutId(w.id);
+      const { data: rows } = await supabase
+        .from('exercises_logs')
+        .select('exercise_id, exercise_name, sets')
+        .eq('workout_id', w.id);
+      setExerciseLogs(((rows ?? []) as unknown as CloudExerciseLog[]));
+    }
+    setLoading(false);
+  }, [user, date]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  /** Upsert otimista de um exercício (substitui sets do exercício). */
+  const upsertExercise = useCallback(
+    async (log: CloudExerciseLog) => {
+      // optimistic
+      setExerciseLogs((prev) => {
+        const filtered = prev.filter((e) => e.exercise_id !== log.exercise_id);
+        return [...filtered, log];
+      });
+      if (!user) return;
+      // garante o workout
+      let wid = workoutId;
+      if (!wid) {
+        const { data: w, error } = await supabase
+          .from('workouts')
+          .upsert(
+            { user_id: user.id, date, type: workoutType },
+            { onConflict: 'user_id,date' }
+          )
+          .select('id')
+          .single();
+        if (error || !w) {
+          console.error('workout upsert:', error);
+          return;
+        }
+        wid = w.id;
+        setWorkoutId(wid);
+      }
+      // delete antigo + insert novo via fila? Aqui fazemos delete imediato (online)
+      // e enfileiramos o insert (resiliente a offline).
+      await supabase
+        .from('exercises_logs')
+        .delete()
+        .eq('workout_id', wid)
+        .eq('exercise_id', log.exercise_id);
+      await enqueue({
+        table: 'exercises_logs',
+        payload: {
+          user_id: user.id,
+          workout_id: wid,
+          exercise_id: log.exercise_id,
+          exercise_name: log.exercise_name,
+          sets: log.sets,
+        },
+      });
+    },
+    [user, workoutId, date, workoutType]
+  );
+
+  return { exerciseLogs, loading, upsertExercise, refresh };
 }
 
 export function usePersonalRecords() {
