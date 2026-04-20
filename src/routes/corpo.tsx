@@ -4,8 +4,10 @@ import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { todayKey } from "../lib/storage";
 import { useBodyMetrics } from "../lib/cloud-hooks";
-import { Save, Camera, TrendingDown, Ruler } from "lucide-react";
+import { Save, Camera, TrendingDown, Ruler, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "../lib/auth-context";
+import { uploadBodyPhoto } from "../lib/storage-upload";
 
 export const Route = createFileRoute("/corpo")({
   component: CorpoPage,
@@ -28,9 +30,12 @@ type FormState = Partial<Record<typeof measurements[number]['key'], number>>;
 
 function CorpoPage() {
   const today = todayKey();
+  const { user } = useAuth();
   const { data: logs, upsertMetric } = useBodyMetrics();
   const [form, setForm] = useState<FormState>({});
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const todayLog = logs.find(l => l.date === today);
@@ -48,6 +53,18 @@ function CorpoPage() {
   }, [logs, today]);
 
   async function handleSave() {
+    let photoUrl: string | null = null;
+    if (photoFile && user) {
+      try {
+        setUploading(true);
+        photoUrl = await uploadBodyPhoto(user.id, today, photoFile);
+      } catch (e) {
+        console.error(e);
+        toast.error("Falha no upload da foto — salvando medidas mesmo assim");
+      } finally {
+        setUploading(false);
+      }
+    }
     await upsertMetric({
       date: today,
       weight: form.weight ?? null,
@@ -57,14 +74,16 @@ function CorpoPage() {
       thigh: form.thigh ?? null,
       hip: form.hip ?? null,
       body_fat: form.body_fat ?? null,
-      photo_url: photoPreview ?? null,
+      photo_url: photoUrl,
     });
+    setPhotoFile(null);
     toast.success("✅ Medidas salvas");
   }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => {
       setPhotoPreview(reader.result as string);
@@ -116,9 +135,11 @@ function CorpoPage() {
 
           <button
             onClick={handleSave}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-lg text-sm font-bold"
+            disabled={uploading}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-lg text-sm font-bold disabled:opacity-60"
           >
-            <Save size={16} /> Salvar Registro
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {uploading ? "Enviando foto..." : "Salvar Registro"}
           </button>
         </div>
       </div>

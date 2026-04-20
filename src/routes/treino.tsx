@@ -6,10 +6,11 @@ import { defaultTrainingPlan, progressionTips } from "../lib/training-data";
 import type { TrainingDay, Exercise } from "../lib/training-data";
 import { load, save, todayKey } from "../lib/storage";
 import type { WorkoutLog } from "../lib/storage";
-import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check, Timer, Edit3, Trash2, ExternalLink, Flame } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw, Plus, Minus, Check, Timer, Edit3, ExternalLink, Flame } from "lucide-react";
 import { RestTimer } from "../components/RestTimer";
 import { EditExerciseDialog } from "../components/EditExerciseDialog";
 import { getExerciseGifUrl, workoutCalories } from "../lib/exercise-utils";
+import { useTodayWorkout } from "../lib/cloud-hooks";
 export const Route = createFileRoute("/treino")({
   component: TreinoPage,
   head: () => ({
@@ -32,6 +33,10 @@ function TreinoPage() {
   // Load custom plan or default
   const [plan, setPlan] = useState<TrainingDay[]>(defaultTrainingPlan);
 
+  const day = plan[selectedDay];
+  const today = todayKey();
+  const { upsertExercise } = useTodayWorkout(day?.id ?? 'unknown');
+
   useEffect(() => {
     const custom = load<TrainingDay[] | null>('custom_training_plan', null);
     if (custom) setPlan(custom);
@@ -43,11 +48,20 @@ function TreinoPage() {
     save('custom_training_plan', newPlan);
   }
 
-  const day = plan[selectedDay];
-  const today = todayKey();
-
   function getExerciseLogs(exerciseId: string): WorkoutLog | undefined {
     return logs.find(l => l.date === today && l.exerciseId === exerciseId);
+  }
+
+  /** Sincroniza um exercício específico com o cloud (fila offline). */
+  function syncExercise(exerciseId: string, updatedLogs: WorkoutLog[]) {
+    const log = updatedLogs.find(l => l.date === today && l.exerciseId === exerciseId);
+    const ex = day?.exercises.find(e => e.id === exerciseId);
+    if (!ex) return;
+    void upsertExercise({
+      exercise_id: exerciseId,
+      exercise_name: ex.name,
+      sets: log?.sets ?? [],
+    });
   }
 
   function addSet(exerciseId: string) {
@@ -60,6 +74,7 @@ function TreinoPage() {
     }
     setLogs(updated);
     save('workout_logs', updated);
+    syncExercise(exerciseId, updated);
   }
 
   function updateSet(exerciseId: string, setIndex: number, field: 'reps' | 'weight', value: number) {
@@ -69,6 +84,7 @@ function TreinoPage() {
       existing.sets[setIndex][field] = value;
       setLogs(updated);
       save('workout_logs', updated);
+      syncExercise(exerciseId, updated);
     }
   }
 
@@ -83,6 +99,7 @@ function TreinoPage() {
       }
       setLogs(updated);
       save('workout_logs', updated);
+      syncExercise(exerciseId, updated);
     }
   }
 

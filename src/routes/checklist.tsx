@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { load, save, todayKey } from "../lib/storage";
 import type { DailyCheck } from "../lib/storage";
 import { antiFailProtocol } from "../lib/training-data";
+import { useHabits, type CloudHabit } from "../lib/cloud-hooks";
 import { Dumbbell, Flame, Moon, Droplets, Activity, Pill, Save, Shield, Bell, BellOff } from "lucide-react";
 import {
   getNotificationSettings,
@@ -22,57 +23,73 @@ export const Route = createFileRoute("/checklist")({
 });
 
 const checkItems = [
-  { key: 'treino' as const, label: 'Treinou hoje', icon: Dumbbell },
-  { key: 'dieta' as const, label: 'Seguiu a dieta', icon: Flame },
-  { key: 'sono' as const, label: 'Dormiu bem (7h+)', icon: Moon },
-  { key: 'agua' as const, label: 'Bebeu 3L+ de água', icon: Droplets },
-  { key: 'cardio' as const, label: 'Fez cardio', icon: Activity },
-  { key: 'suplementos' as const, label: 'Tomou suplementos', icon: Pill },
+  { key: 'treino' as const, label: 'Treinou hoje', icon: Dumbbell, habitField: 'workout_done' as const },
+  { key: 'dieta' as const, label: 'Seguiu a dieta', icon: Flame, habitField: 'diet_ok' as const },
+  { key: 'sono' as const, label: 'Dormiu bem (7h+)', icon: Moon, habitField: 'sleep_hours' as const },
+  { key: 'agua' as const, label: 'Bebeu 3L+ de água', icon: Droplets, habitField: 'water' as const },
+  { key: 'cardio' as const, label: 'Fez cardio', icon: Activity, habitField: 'cardio' as const },
+  { key: 'suplementos' as const, label: 'Tomou suplementos', icon: Pill, habitField: 'supplements' as const },
 ];
 
 function ChecklistPage() {
   const today = todayKey();
-  const [checks, setChecks] = useState<DailyCheck[]>([]);
+  const { data: habits, upsertHabit } = useHabits();
   const [notes, setNotes] = useState('');
   const [showProtocol, setShowProtocol] = useState(false);
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>(getNotificationSettings());
   const [showNotifPanel, setShowNotifPanel] = useState(false);
 
+  // Notas continuam locais (não há coluna no schema cloud por hábito)
   useEffect(() => {
-    const loaded = load<DailyCheck[]>('daily_checks', []);
-    setChecks(loaded);
-    const todayCheck = loaded.find(c => c.date === today);
-    if (todayCheck) {
-      setNotes(todayCheck.notes);
-    }
-    // Start notifications
+    const localChecks = load<DailyCheck[]>('daily_checks', []);
+    const todayCheck = localChecks.find(c => c.date === today);
+    if (todayCheck) setNotes(todayCheck.notes);
     scheduleNotifications(notifSettings);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [today]);
 
-  const todayCheck = checks.find(c => c.date === today) || {
+  const todayHabit: CloudHabit = useMemo(() => {
+    return (
+      habits.find(h => h.date === today) ?? {
+        date: today,
+        workout_done: false,
+        diet_ok: false,
+        water: false,
+        cardio: false,
+        supplements: false,
+        creatine: false,
+        sleep_hours: null,
+      }
+    );
+  }, [habits, today]);
+
+  // Mapeia para o formato legado (UI usa keys PT-BR)
+  const todayCheck = {
     date: today,
-    treino: false,
-    dieta: false,
-    sono: false,
-    agua: false,
-    cardio: false,
-    suplementos: false,
-    notes: '',
+    treino: todayHabit.workout_done,
+    dieta: todayHabit.diet_ok,
+    sono: !!todayHabit.sleep_hours && todayHabit.sleep_hours >= 7,
+    agua: todayHabit.water,
+    cardio: todayHabit.cardio,
+    suplementos: todayHabit.supplements,
+    notes,
   };
 
   function toggle(key: keyof Omit<DailyCheck, 'date' | 'notes'>) {
-    const updated = checks.filter(c => c.date !== today);
-    const newCheck = { ...todayCheck, [key]: !todayCheck[key] };
-    updated.push(newCheck);
-    setChecks(updated);
-    save('daily_checks', updated);
+    const item = checkItems.find(i => i.key === key)!;
+    const next: CloudHabit = { ...todayHabit };
+    if (item.habitField === 'sleep_hours') {
+      next.sleep_hours = todayCheck.sono ? null : 7;
+    } else {
+      next[item.habitField] = !todayCheck[key];
+    }
+    void upsertHabit(next);
   }
 
   function saveNotes() {
-    const updated = checks.filter(c => c.date !== today);
-    updated.push({ ...todayCheck, notes });
-    setChecks(updated);
-    save('daily_checks', updated);
+    const localChecks = load<DailyCheck[]>('daily_checks', []).filter(c => c.date !== today);
+    localChecks.push({ ...todayCheck, notes });
+    save('daily_checks', localChecks);
   }
 
   const completedCount = checkItems.filter(item => todayCheck[item.key]).length;

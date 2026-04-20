@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useBodyMetrics, useHabits, usePersonalRecords, useNutritionHistory } from "../lib/cloud-hooks";
 import { generateWeeklyInsights } from "../server/insights";
 import { weekStartISO, todayISO } from "../lib/date-utils";
+import { getCachedInsight, setCachedInsight, cacheRemainingHours } from "../lib/insights-cache";
 import { toast } from "sonner";
 
 export function AIInsightsCard() {
@@ -16,8 +17,29 @@ export function AIInsightsCard() {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
-  async function handleAnalyze() {
+  // Hidrata do cache no mount
+  useEffect(() => {
+    const c = getCachedInsight();
+    if (c) {
+      setContent(c.content);
+      setGeneratedAt(c.generatedAt);
+      setFromCache(true);
+    }
+  }, []);
+
+  async function handleAnalyze(force = false) {
+    if (!force) {
+      const c = getCachedInsight();
+      if (c) {
+        setContent(c.content);
+        setGeneratedAt(c.generatedAt);
+        setFromCache(true);
+        toast.info(`💡 Usando análise em cache (válida por mais ${cacheRemainingHours(c)}h)`);
+        return;
+      }
+    }
     setLoading(true);
     try {
       const weekStart = weekStartISO();
@@ -63,6 +85,8 @@ export function AIInsightsCard() {
       const result = await generateWeeklyInsights({ data: { snapshot } });
       setContent(result.content);
       setGeneratedAt(result.generatedAt);
+      setFromCache(false);
+      setCachedInsight({ content: result.content, generatedAt: result.generatedAt });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao gerar insights";
       toast.error(msg);
@@ -88,7 +112,7 @@ export function AIInsightsCard() {
           </div>
           {content && !loading && (
             <button
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze(true)}
               className="flex items-center gap-1 text-[10px] text-primary font-bold"
             >
               <RefreshCw size={10} /> Atualizar
@@ -98,7 +122,7 @@ export function AIInsightsCard() {
 
         {!content && !loading && (
           <button
-            onClick={handleAnalyze}
+            onClick={() => handleAnalyze(false)}
             className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-lg flex items-center justify-center gap-2 text-sm"
           >
             <Sparkles size={14} /> Analisar minha semana
@@ -117,6 +141,7 @@ export function AIInsightsCard() {
             {generatedAt && (
               <p className="text-[9px] text-muted-foreground mt-3 italic">
                 Gerado em {new Date(generatedAt).toLocaleString("pt-BR")}
+                {fromCache && " · cache 24h"}
               </p>
             )}
           </div>
