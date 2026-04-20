@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TreinoRouteImport } from './routes/treino'
+import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as FerramentasRouteImport } from './routes/ferramentas'
 import { Route as DietaRouteImport } from './routes/dieta'
 import { Route as CorpoRouteImport } from './routes/corpo'
@@ -20,6 +21,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TreinoRoute = TreinoRouteImport.update({
   id: '/treino',
   path: '/treino',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HojeRoute = HojeRouteImport.update({
+  id: '/hoje',
+  path: '/hoje',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FerramentasRoute = FerramentasRouteImport.update({
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
   '/ferramentas': typeof FerramentasRoute
+  '/hoje': typeof HojeRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
   '/ferramentas': typeof FerramentasRoute
+  '/hoje': typeof HojeRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/corpo': typeof CorpoRoute
   '/dieta': typeof DietaRoute
   '/ferramentas': typeof FerramentasRoute
+  '/hoje': typeof HojeRoute
   '/treino': typeof TreinoRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/corpo'
     | '/dieta'
     | '/ferramentas'
+    | '/hoje'
     | '/treino'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/corpo'
     | '/dieta'
     | '/ferramentas'
+    | '/hoje'
     | '/treino'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/corpo'
     | '/dieta'
     | '/ferramentas'
+    | '/hoje'
     | '/treino'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   CorpoRoute: typeof CorpoRoute
   DietaRoute: typeof DietaRoute
   FerramentasRoute: typeof FerramentasRoute
+  HojeRoute: typeof HojeRoute
   TreinoRoute: typeof TreinoRoute
 }
 
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/treino'
       fullPath: '/treino'
       preLoaderRoute: typeof TreinoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hoje': {
+      id: '/hoje'
+      path: '/hoje'
+      fullPath: '/hoje'
+      preLoaderRoute: typeof HojeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ferramentas': {
@@ -182,8 +202,18 @@ const rootRouteChildren: RootRouteChildren = {
   CorpoRoute: CorpoRoute,
   DietaRoute: DietaRoute,
   FerramentasRoute: FerramentasRoute,
+  HojeRoute: HojeRoute,
   TreinoRoute: TreinoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
