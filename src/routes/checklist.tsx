@@ -81,7 +81,7 @@ function ChecklistPage() {
     if (item.habitField === 'sleep_hours') {
       next.sleep_hours = todayCheck.sono ? null : 7;
     } else {
-      (next as Record<string, unknown>)[item.habitField] = !todayCheck[key];
+      next[item.habitField] = !todayCheck[key];
     }
     void upsertHabit(next);
   }

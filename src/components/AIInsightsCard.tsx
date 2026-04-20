@@ -85,6 +85,8 @@ export function AIInsightsCard() {
       const result = await generateWeeklyInsights({ data: { snapshot } });
       setContent(result.content);
       setGeneratedAt(result.generatedAt);
+      setFromCache(false);
+      setCachedInsight({ content: result.content, generatedAt: result.generatedAt });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao gerar insights";
       toast.error(msg);
@@ -110,7 +112,7 @@ export function AIInsightsCard() {
           </div>
           {content && !loading && (
             <button
-              onClick={handleAnalyze}
+              onClick={() => handleAnalyze(true)}
               className="flex items-center gap-1 text-[10px] text-primary font-bold"
             >
               <RefreshCw size={10} /> Atualizar
@@ -120,7 +122,7 @@ export function AIInsightsCard() {
 
         {!content && !loading && (
           <button
-            onClick={handleAnalyze}
+            onClick={() => handleAnalyze(false)}
             className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-lg flex items-center justify-center gap-2 text-sm"
           >
             <Sparkles size={14} /> Analisar minha semana
@@ -139,6 +141,7 @@ export function AIInsightsCard() {
             {generatedAt && (
               <p className="text-[9px] text-muted-foreground mt-3 italic">
                 Gerado em {new Date(generatedAt).toLocaleString("pt-BR")}
+                {fromCache && " · cache 24h"}
               </p>
             )}
           </div>
