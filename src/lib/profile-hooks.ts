@@ -105,7 +105,7 @@ export function useUserProfile() {
       // primeira vez → cria com defaults
       void supabase
         .from('user_profiles')
-        .insert([{ user_id: user.id, ...DEFAULT_PROFILE }])
+        .insert([{ user_id: user.id, ...DEFAULT_PROFILE, training_schedule: DEFAULT_PROFILE.training_schedule as unknown as Record<string, string> }])
         .then(({ error: e }) => e && console.error('profile insert:', e));
     }
     setLoading(false);
