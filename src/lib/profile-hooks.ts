@@ -95,7 +95,8 @@ export function useUserProfile() {
         triggers: row.triggers ?? [],
         preferences: row.preferences ?? [],
         restrictions: row.restrictions ?? [],
-        training_schedule: (row.training_schedule as TrainingSchedule) ?? DEFAULT_SCHEDULE,
+        training_schedule:
+          (row.training_schedule as unknown as TrainingSchedule) ?? DEFAULT_SCHEDULE,
         training_time: row.training_time,
       };
       setProfile(next);
@@ -104,7 +105,7 @@ export function useUserProfile() {
       // primeira vez → cria com defaults
       void supabase
         .from('user_profiles')
-        .insert({ user_id: user.id, ...DEFAULT_PROFILE })
+        .insert([{ user_id: user.id, ...DEFAULT_PROFILE }])
         .then(({ error: e }) => e && console.error('profile insert:', e));
     }
     setLoading(false);
