@@ -116,9 +116,13 @@ export type Database = {
           creatine: boolean
           date: string
           diet_ok: boolean
+          energy_level: number | null
+          hunger_level: number | null
           id: string
+          mood_level: number | null
           notes: string | null
           sleep_hours: number | null
+          sugar_urge: number | null
           supplements: boolean
           updated_at: string
           user_id: string
@@ -131,9 +135,13 @@ export type Database = {
           creatine?: boolean
           date: string
           diet_ok?: boolean
+          energy_level?: number | null
+          hunger_level?: number | null
           id?: string
+          mood_level?: number | null
           notes?: string | null
           sleep_hours?: number | null
+          sugar_urge?: number | null
           supplements?: boolean
           updated_at?: string
           user_id: string
@@ -146,9 +154,13 @@ export type Database = {
           creatine?: boolean
           date?: string
           diet_ok?: boolean
+          energy_level?: number | null
+          hunger_level?: number | null
           id?: string
+          mood_level?: number | null
           notes?: string | null
           sleep_hours?: number | null
+          sugar_urge?: number | null
           supplements?: boolean
           updated_at?: string
           user_id?: string
@@ -260,6 +272,69 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          age: number | null
+          calorie_target: number | null
+          created_at: string
+          current_focus: string | null
+          goal_bf_pct: number | null
+          goal_weight_kg: number | null
+          height_cm: number | null
+          id: string
+          notes: string | null
+          preferences: string[] | null
+          restrictions: string[] | null
+          start_bf_pct: number | null
+          start_weight_kg: number | null
+          training_schedule: Json | null
+          training_time: string | null
+          triggers: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age?: number | null
+          calorie_target?: number | null
+          created_at?: string
+          current_focus?: string | null
+          goal_bf_pct?: number | null
+          goal_weight_kg?: number | null
+          height_cm?: number | null
+          id?: string
+          notes?: string | null
+          preferences?: string[] | null
+          restrictions?: string[] | null
+          start_bf_pct?: number | null
+          start_weight_kg?: number | null
+          training_schedule?: Json | null
+          training_time?: string | null
+          triggers?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age?: number | null
+          calorie_target?: number | null
+          created_at?: string
+          current_focus?: string | null
+          goal_bf_pct?: number | null
+          goal_weight_kg?: number | null
+          height_cm?: number | null
+          id?: string
+          notes?: string | null
+          preferences?: string[] | null
+          restrictions?: string[] | null
+          start_bf_pct?: number | null
+          start_weight_kg?: number | null
+          training_schedule?: Json | null
+          training_time?: string | null
+          triggers?: string[] | null
           updated_at?: string
           user_id?: string
         }

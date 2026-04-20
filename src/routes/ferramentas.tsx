@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
-import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog, Bell } from "lucide-react";
+import { Calculator, Trophy, Bone, Shuffle, ChevronDown, ChevronUp, Trash2, TrendingUp, UserCog, Bell, User } from "lucide-react";
 import { RemindersPanel } from "../components/RemindersPanel";
+import { ProfileEditor } from "../components/ProfileEditor";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import {
   calculate1RM,
@@ -23,12 +24,13 @@ export const Route = createFileRoute("/ferramentas")({
   }),
 });
 
-type Tab = "1rm" | "pr" | "bio" | "alt" | "lemb" | "conta";
+type Tab = "perfil" | "1rm" | "pr" | "bio" | "alt" | "lemb" | "conta";
 
 function FerramentasPage() {
-  const [tab, setTab] = useState<Tab>("1rm");
+  const [tab, setTab] = useState<Tab>("perfil");
 
   const tabs: { id: Tab; label: string; icon: typeof Calculator }[] = [
+    { id: "perfil", label: "Perfil", icon: User },
     { id: "1rm", label: "1RM", icon: Calculator },
     { id: "pr", label: "PRs", icon: Trophy },
     { id: "bio", label: "Bio", icon: Bone },
@@ -42,20 +44,20 @@ function FerramentasPage() {
       <PageHeader title="FERRAMENTAS" subtitle="Calculadoras & Guias" emoji="🧮" />
 
       {/* Tab selector */}
-      <div className="px-4 mb-4 flex gap-2">
+      <div className="px-4 mb-4 flex gap-1.5 overflow-x-auto pb-1">
         {tabs.map((t) => {
           const Icon = t.icon;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-shrink-0 flex flex-col items-center gap-1 py-2 px-3 rounded-xl text-[10px] font-bold transition-all ${
                 tab === t.id
                   ? "bg-primary text-primary-foreground neon-glow"
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              <Icon size={16} />
+              <Icon size={14} />
               {t.label}
             </button>
           );
@@ -70,6 +72,7 @@ function FerramentasPage() {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.15 }}
         >
+          {tab === "perfil" && <div className="px-4"><ProfileEditor /></div>}
           {tab === "1rm" && <RMCalculator />}
           {tab === "pr" && <PRTracker />}
           {tab === "bio" && <BiomechanicsGuide />}
