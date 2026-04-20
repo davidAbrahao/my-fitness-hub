@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useBodyMetrics, useHabits, usePersonalRecords, useNutritionHistory } from "../lib/cloud-hooks";
 import { generateWeeklyInsights } from "../server/insights";
 import { weekStartISO, todayISO } from "../lib/date-utils";
+import { getCachedInsight, setCachedInsight, cacheRemainingHours } from "../lib/insights-cache";
 import { toast } from "sonner";
 
 export function AIInsightsCard() {
@@ -16,8 +17,29 @@ export function AIInsightsCard() {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
-  async function handleAnalyze() {
+  // Hidrata do cache no mount
+  useEffect(() => {
+    const c = getCachedInsight();
+    if (c) {
+      setContent(c.content);
+      setGeneratedAt(c.generatedAt);
+      setFromCache(true);
+    }
+  }, []);
+
+  async function handleAnalyze(force = false) {
+    if (!force) {
+      const c = getCachedInsight();
+      if (c) {
+        setContent(c.content);
+        setGeneratedAt(c.generatedAt);
+        setFromCache(true);
+        toast.info(`💡 Usando análise em cache (válida por mais ${cacheRemainingHours(c)}h)`);
+        return;
+      }
+    }
     setLoading(true);
     try {
       const weekStart = weekStartISO();
